@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"reflect"
 
 	"github.com/streadway/amqp"
 )
@@ -45,7 +46,7 @@ func (cp *amqpCommandProcessor) Post(message Message) error {
 		return errors.New("Failed to publish message")
 	}
 
-	log.Printf("Sent %s", body)
+	log.Printf("Sent %s %s to %s", reflect.TypeOf(message), body, routingKey)
 	return nil
 }
 

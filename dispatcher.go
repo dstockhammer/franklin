@@ -1,7 +1,9 @@
 package franklin
 
 import (
+	"encoding/json"
 	"log"
+	"reflect"
 
 	"github.com/streadway/amqp"
 )
@@ -26,18 +28,19 @@ type amqpDispatcher struct {
 // and dispatching them to request handlers.
 func (d *amqpDispatcher) Receive() {
 	for key, consumer := range d.subscriberRegistry.Consumers() {
+		queueName := d.subscriberRegistry.QueueForKey(key)
 		q, err := d.channel.QueueDeclare(
-			key,   // name
-			false, // durable
-			false, // delete when usused
-			false, // exclusive
-			false, // no-wait
-			nil,   // arguments
+			queueName, // name
+			true,      // durable
+			false,     // delete when usused
+			false,     // exclusive
+			false,     // no-wait
+			nil,       // arguments
 		)
 		failOnError(err, "Failed to declare queue")
 
 		d.channel.QueueBind(
-			key,        // name of the queue
+			queueName,  // name of the queue
 			key,        // bindingKey
 			d.exchange, // sourceExchange
 			false,      // noWait
@@ -71,13 +74,22 @@ func (d *amqpDispatcher) Close() {
 func (d *amqpDispatcher) consume(key string, handler MessageHandler, deliveries <-chan amqp.Delivery) {
 	log.Printf("Consuming %s...", key)
 
-	messageMapper := d.messageMapperRegistry.MapperForKey(key)
-
 	for delivery := range deliveries {
 		log.Printf("%s: Received %d bytes: [%v] %q",
 			key, len(delivery.Body), delivery.DeliveryTag, delivery.Body)
 
-		message, err := messageMapper.MapToMessage(delivery.Body)
+		messageType := handler.MessageType()
+		var message Message
+		var err error
+
+		messageMapper := d.messageMapperRegistry.MapperForType(messageType)
+		if messageMapper != nil {
+			message, err = messageMapper.MapToMessage(delivery.Body)
+		} else {
+			// todo: investigate why this doesn't work
+			message = reflect.Zero(messageType)
+			err = json.Unmarshal([]byte(delivery.Body), &message)
+		}
 
 		if err != nil {
 			log.Printf("Error: %s", err.Error())

@@ -6,6 +6,7 @@ import "reflect"
 type MessageHandler interface {
 	// MessageType returns the message type that this handler subscribes to
 	MessageType() reflect.Type
+
 	// Handle handles a message of the type returned by MessageType()
 	Handle(message Message) error
 }

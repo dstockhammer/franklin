@@ -1,36 +1,39 @@
 package franklin
 
-import "errors"
+import (
+	"fmt"
+	"reflect"
+)
 
-// MessageMapperRegistry blabla
+// MessageMapperRegistry is currently not in use
 type MessageMapperRegistry struct {
-	mappers map[string]MessageMapper
-}
-
-// MessageMapper maps messages to and from their string representations
-type MessageMapper interface {
-	// MapToMessage creates a typed message from its JSON representation
-	MapToMessage(json []byte) (Message, error)
+	mappers map[reflect.Type]MessageMapper
 }
 
 // Register adds a mapper registration to the message mapper registry
-func (r *MessageMapperRegistry) Register(key string, mapper MessageMapper) error {
-	if r.mappers[key] != nil {
-		return errors.New("Registration with key <" + key + "> already exists")
+func (r *MessageMapperRegistry) Register(mapper MessageMapper) error {
+	messageType := mapper.MessageType()
+
+	if _, exists := r.mappers[messageType]; exists {
+		return fmt.Errorf("Mapper for %s is already registered", messageType)
 	}
 
-	r.mappers[key] = mapper
+	r.mappers[messageType] = mapper
 
 	return nil
 }
 
-// MapperForKey returns the message mapper for a key
-func (r *MessageMapperRegistry) MapperForKey(key string) MessageMapper {
-	return r.mappers[key]
+// MapperForType returns the message mapper for a message type
+func (r *MessageMapperRegistry) MapperForType(messageType reflect.Type) MessageMapper {
+	if mapper, exists := r.mappers[messageType]; exists {
+		return mapper
+	}
+
+	return nil
 }
 
 // NewMessageMapperRegistry creates an empty message mapper registry
 func NewMessageMapperRegistry() *MessageMapperRegistry {
 	return &MessageMapperRegistry{
-		mappers: make(map[string]MessageMapper)}
+		mappers: make(map[reflect.Type]MessageMapper)}
 }
